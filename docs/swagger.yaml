@@ -1,0 +1,409 @@
+basePath: /
+definitions:
+  github_com_vultisig_vultiserver_internal_types.KeysignRequest:
+    properties:
+      derive_path:
+        description: Derive Path
+        type: string
+      hex_encryption_key:
+        description: Hex encryption key, used to encrypt the keysign messages
+        type: string
+      is_ecdsa:
+        description: indicate use ECDSA or EDDSA key to sign the messages
+        type: boolean
+      messages:
+        description: Messages need to be signed
+        items:
+          type: string
+        type: array
+      public_key:
+        description: public key, used to identify the backup file
+        type: string
+      session:
+        description: Session ID , it should be an UUID
+        type: string
+      vault_password:
+        description: password used to decrypt the vault file
+        type: string
+    type: object
+  github_com_vultisig_vultiserver_internal_types.LibType:
+    enum:
+    - 0
+    - 1
+    type: integer
+    x-enum-varnames:
+    - GG20
+    - DKLS
+  github_com_vultisig_vultiserver_internal_types.MigrationRequest:
+    properties:
+      email:
+        type: string
+      encryption_password:
+        description: password used to encrypt the vault file
+        type: string
+      hex_encryption_key:
+        description: hex encryption key
+        type: string
+      public_key:
+        description: public key ecdsa
+        type: string
+      session_id:
+        description: session id
+        type: string
+    type: object
+  github_com_vultisig_vultiserver_internal_types.ReshareRequest:
+    properties:
+      email:
+        type: string
+      encryption_password:
+        description: password used to encrypt the vault file
+        type: string
+      hex_chain_code:
+        description: hex chain code
+        type: string
+      hex_encryption_key:
+        description: hex encryption key
+        type: string
+      lib_type:
+        $ref: '#/definitions/github_com_vultisig_vultiserver_internal_types.LibType'
+      local_party_id:
+        description: local party id
+        type: string
+      name:
+        description: name of the vault
+        type: string
+      old_parties:
+        description: old parties
+        items:
+          type: string
+        type: array
+      old_reshare_prefix:
+        type: string
+      public_key:
+        description: public key ecdsa
+        type: string
+      reshare_type:
+        $ref: '#/definitions/github_com_vultisig_vultiserver_internal_types.ReshareType'
+      session_id:
+        description: session id
+        type: string
+    type: object
+  github_com_vultisig_vultiserver_internal_types.ReshareType:
+    enum:
+    - 0
+    - 1
+    type: integer
+    x-enum-varnames:
+    - Normal
+    - Plugin
+  github_com_vultisig_vultiserver_internal_types.VaultCreateRequest:
+    properties:
+      email:
+        description: this is the email of the user that the vault backup will be sent
+          to
+        type: string
+      encryption_password:
+        description: password used to encrypt the vault file
+        type: string
+      hex_chain_code:
+        type: string
+      hex_encryption_key:
+        description: this is the key used to encrypt and decrypt the keygen communications
+        type: string
+      lib_type:
+        allOf:
+        - $ref: '#/definitions/github_com_vultisig_vultiserver_internal_types.LibType'
+        description: this is the type of the vault
+      local_party_id:
+        description: when this field is empty , then server will generate a random
+          local party id
+        type: string
+      name:
+        type: string
+      session_id:
+        type: string
+    required:
+    - email
+    - encryption_password
+    - hex_chain_code
+    - hex_encryption_key
+    - name
+    - session_id
+    type: object
+  github_com_vultisig_vultiserver_internal_types.VaultGetResponse:
+    properties:
+      hex_chain_code:
+        type: string
+      local_party_id:
+        type: string
+      name:
+        type: string
+      public_key_ecdsa:
+        type: string
+      public_key_eddsa:
+        type: string
+    type: object
+  github_com_vultisig_vultiserver_internal_types.VaultResendRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+      public_key_ecdsa:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: Vultisig server API for vault management and cryptographic operations
+  title: Vultiserver API
+  version: "1.0"
+paths:
+  /getDerivedPublicKey:
+    get:
+      description: Get the derived public key from base public key and derivation
+        path
+      parameters:
+      - description: Base public key
+        in: query
+        name: publicKey
+        required: true
+        type: string
+      - description: Hex encoded chain code
+        in: query
+        name: hexChainCode
+        required: true
+        type: string
+      - description: Derivation path
+        in: query
+        name: derivePath
+        required: true
+        type: string
+      - description: 'Use EdDSA key (default: false)'
+        in: query
+        name: isEdDSA
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Derived public key
+          schema:
+            type: string
+        "400":
+          description: Invalid parameters
+          schema:
+            type: string
+      summary: Get derived public key
+      tags:
+      - crypto
+  /ping:
+    get:
+      description: Check if the server is running
+      produces:
+      - text/plain
+      responses:
+        "200":
+          description: Vultiserver is running
+          schema:
+            type: string
+      summary: Health check endpoint
+      tags:
+      - health
+  /vault/create:
+    post:
+      consumes:
+      - application/json
+      description: Create a new vault with the specified parameters
+      parameters:
+      - description: Vault creation request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_vultisig_vultiserver_internal_types.VaultCreateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Invalid request
+          schema:
+            type: string
+      summary: Create a new vault
+      tags:
+      - vault
+  /vault/exist/{publicKeyECDSA}:
+    get:
+      description: Check if a vault exists by public key ECDSA
+      parameters:
+      - description: Public key ECDSA (66 characters hex)
+        in: path
+        name: publicKeyECDSA
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad Request
+      summary: Check if vault exists
+      tags:
+      - vault
+  /vault/get/{publicKeyECDSA}:
+    get:
+      description: Get vault data by public key ECDSA
+      parameters:
+      - description: Public key ECDSA (66 characters hex)
+        in: path
+        name: publicKeyECDSA
+        required: true
+        type: string
+      - description: Vault password (base64 encoded)
+        in: header
+        name: x-password
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_vultisig_vultiserver_internal_types.VaultGetResponse'
+        "400":
+          description: Invalid request
+          schema:
+            type: string
+      security:
+      - XPassword: []
+      summary: Get vault data
+      tags:
+      - vault
+  /vault/migrate:
+    post:
+      consumes:
+      - application/json
+      description: Migrate an existing vault from GG20 library to DKLS library
+      parameters:
+      - description: Migration request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_vultisig_vultiserver_internal_types.MigrationRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Invalid request
+          schema:
+            type: string
+      summary: Migrate a vault from GG20 to DKLS
+      tags:
+      - vault
+  /vault/resend:
+    post:
+      consumes:
+      - application/json
+      description: Request server to send vault share and code through email again
+      parameters:
+      - description: Resend request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_vultisig_vultiserver_internal_types.VaultResendRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad Request
+        "429":
+          description: Too many requests
+      summary: Resend vault email
+      tags:
+      - vault
+  /vault/reshare:
+    post:
+      consumes:
+      - application/json
+      description: Reshare an existing vault with new or existing parties
+      parameters:
+      - description: Reshare request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_vultisig_vultiserver_internal_types.ReshareRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Invalid request
+          schema:
+            type: string
+      summary: Reshare a vault
+      tags:
+      - vault
+  /vault/sign:
+    post:
+      consumes:
+      - application/json
+      description: Sign messages using the vault's key
+      parameters:
+      - description: Keysign request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_vultisig_vultiserver_internal_types.KeysignRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Task ID
+          schema:
+            type: string
+        "400":
+          description: Invalid request
+          schema:
+            type: string
+      summary: Sign messages
+      tags:
+      - vault
+  /vault/verify/{publicKeyECDSA}/{code}:
+    get:
+      description: Verify the code sent via email
+      parameters:
+      - description: Public key ECDSA (66 characters hex)
+        in: path
+        name: publicKeyECDSA
+        required: true
+        type: string
+      - description: Verification code
+        in: path
+        name: code
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad Request
+      summary: Verify code
+      tags:
+      - vault
+securityDefinitions:
+  XPassword:
+    in: header
+    name: x-password
+    type: apiKey
+swagger: "2.0"

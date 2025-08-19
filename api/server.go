@@ -18,9 +18,11 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/labstack/gommon/log"
 	"github.com/sirupsen/logrus"
+	echoSwagger "github.com/swaggo/echo-swagger"
 	keygen "github.com/vultisig/commondata/go/vultisig/keygen/v1"
 	"github.com/vultisig/mobile-tss-lib/tss"
 
+	_ "github.com/vultisig/vultiserver/docs" // swagger docs
 	"github.com/vultisig/vultiserver/common"
 	"github.com/vultisig/vultiserver/internal/tasks"
 	"github.com/vultisig/vultiserver/internal/types"
@@ -58,6 +60,15 @@ func NewServer(port int64,
 	}
 }
 
+// StartServer starts the HTTP server
+// @title Vultiserver API
+// @version 1.0
+// @description Vultisig server API for vault management and cryptographic operations
+// @host localhost:8080
+// @BasePath /
+// @securityDefinitions.apikey XPassword
+// @in header
+// @name x-password
 func (s *Server) StartServer() error {
 	e := echo.New()
 	e.Logger.SetLevel(log.DEBUG)
@@ -72,6 +83,7 @@ func (s *Server) StartServer() error {
 	)
 	e.Use(middleware.RateLimiter(limiterStore))
 	e.GET("/ping", s.Ping)
+	e.GET("/swagger/*", echoSwagger.WrapHandler)
 	e.GET("/getDerivedPublicKey", s.GetDerivedPublicKey)
 	grp := e.Group("/vault")
 
@@ -104,11 +116,29 @@ func (s *Server) statsdMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
 		return err
 	}
 }
+// Ping godoc
+// @Summary Health check endpoint
+// @Description Check if the server is running
+// @Tags health
+// @Produce plain
+// @Success 200 {string} string "Vultiserver is running"
+// @Router /ping [get]
 func (s *Server) Ping(c echo.Context) error {
 	return c.String(http.StatusOK, "Vultiserver is running")
 }
 
-// GetDerivedPublicKey is a handler to get the derived public key
+// GetDerivedPublicKey godoc
+// @Summary Get derived public key
+// @Description Get the derived public key from base public key and derivation path
+// @Tags crypto
+// @Produce json
+// @Param publicKey query string true "Base public key"
+// @Param hexChainCode query string true "Hex encoded chain code"
+// @Param derivePath query string true "Derivation path"
+// @Param isEdDSA query string false "Use EdDSA key (default: false)"
+// @Success 200 {string} string "Derived public key"
+// @Failure 400 {string} string "Invalid parameters"
+// @Router /getDerivedPublicKey [get]
 func (s *Server) GetDerivedPublicKey(c echo.Context) error {
 	publicKey := c.QueryParam("publicKey")
 	if publicKey == "" {
@@ -136,6 +166,16 @@ func (s *Server) GetDerivedPublicKey(c echo.Context) error {
 	return c.JSON(http.StatusOK, derivedPublicKey)
 }
 
+// CreateVault godoc
+// @Summary Create a new vault
+// @Description Create a new vault with the specified parameters
+// @Tags vault
+// @Accept json
+// @Produce json
+// @Param request body types.VaultCreateRequest true "Vault creation request"
+// @Success 200
+// @Failure 400 {string} string "Invalid request"
+// @Router /vault/create [post]
 func (s *Server) CreateVault(c echo.Context) error {
 	var req types.VaultCreateRequest
 	if err := c.Bind(&req); err != nil {
@@ -177,7 +217,16 @@ func (s *Server) CreateVault(c echo.Context) error {
 	return c.NoContent(http.StatusOK)
 }
 
-// ReshareVault is a handler to reshare a vault
+// ReshareVault godoc
+// @Summary Reshare a vault
+// @Description Reshare an existing vault with new or existing parties
+// @Tags vault
+// @Accept json
+// @Produce json
+// @Param request body types.ReshareRequest true "Reshare request"
+// @Success 200
+// @Failure 400 {string} string "Invalid request"
+// @Router /vault/reshare [post]
 func (s *Server) ReshareVault(c echo.Context) error {
 	var req types.ReshareRequest
 	if err := c.Bind(&req); err != nil {
@@ -215,7 +264,16 @@ func (s *Server) ReshareVault(c echo.Context) error {
 	return c.NoContent(http.StatusOK)
 }
 
-// MigrateVault is a handler to migrate a vault from GG20 to DKLS
+// MigrateVault godoc
+// @Summary Migrate a vault from GG20 to DKLS
+// @Description Migrate an existing vault from GG20 library to DKLS library
+// @Tags vault
+// @Accept json
+// @Produce json
+// @Param request body types.MigrationRequest true "Migration request"
+// @Success 200
+// @Failure 400 {string} string "Invalid request"
+// @Router /vault/migrate [post]
 func (s *Server) MigrateVault(c echo.Context) error {
 	var req types.MigrationRequest
 	if err := c.Bind(&req); err != nil {
@@ -312,6 +370,17 @@ func (s *Server) extractXPassword(c echo.Context) (string, error) {
 
 	return passwd, nil
 }
+// GetVault godoc
+// @Summary Get vault data
+// @Description Get vault data by public key ECDSA
+// @Tags vault
+// @Produce json
+// @Param publicKeyECDSA path string true "Public key ECDSA (66 characters hex)"
+// @Param x-password header string true "Vault password (base64 encoded)"
+// @Success 200 {object} types.VaultGetResponse
+// @Failure 400 {string} string "Invalid request"
+// @Security XPassword
+// @Router /vault/get/{publicKeyECDSA} [get]
 func (s *Server) GetVault(c echo.Context) error {
 	publicKeyECDSA := c.Param("publicKeyECDSA")
 	if publicKeyECDSA == "" {
@@ -374,7 +443,16 @@ func (s *Server) DeleteVault(c echo.Context) error {
 	return c.NoContent(http.StatusOK)
 }
 
-// SignMessages is a handler to process Keysing request
+// SignMessages godoc
+// @Summary Sign messages
+// @Description Sign messages using the vault's key
+// @Tags vault
+// @Accept json
+// @Produce json
+// @Param request body types.KeysignRequest true "Keysign request"
+// @Success 200 {string} string "Task ID"
+// @Failure 400 {string} string "Invalid request"
+// @Router /vault/sign [post]
 func (s *Server) SignMessages(c echo.Context) error {
 	var req types.KeysignRequest
 	if err := c.Bind(&req); err != nil {
@@ -462,6 +540,14 @@ func (s *Server) isValidHash(hash string) bool {
 	_, err := hex.DecodeString(hash)
 	return err == nil
 }
+// ExistVault godoc
+// @Summary Check if vault exists
+// @Description Check if a vault exists by public key ECDSA
+// @Tags vault
+// @Param publicKeyECDSA path string true "Public key ECDSA (66 characters hex)"
+// @Success 200
+// @Failure 400
+// @Router /vault/exist/{publicKeyECDSA} [get]
 func (s *Server) ExistVault(c echo.Context) error {
 	publicKeyECDSA := c.Param("publicKeyECDSA")
 	if publicKeyECDSA == "" {
@@ -478,7 +564,17 @@ func (s *Server) ExistVault(c echo.Context) error {
 	return c.NoContent(http.StatusOK)
 }
 
-// ResendVaultEmail is a handler to request server to send vault share , code through email again
+// ResendVaultEmail godoc
+// @Summary Resend vault email
+// @Description Request server to send vault share and code through email again
+// @Tags vault
+// @Accept json
+// @Produce json
+// @Param request body types.VaultResendRequest true "Resend request"
+// @Success 200
+// @Failure 400
+// @Failure 429 "Too many requests"
+// @Router /vault/resend [post]
 func (s *Server) ResendVaultEmail(c echo.Context) error {
 	var req types.VaultResendRequest
 	if err := c.Bind(&req); err != nil {
@@ -556,7 +652,15 @@ func (s *Server) createVerificationCode(ctx context.Context, publicKeyECDSA stri
 	return verificationCode, nil
 }
 
-// VerifyCode is a handler to verify the code
+// VerifyCode godoc
+// @Summary Verify code
+// @Description Verify the code sent via email
+// @Tags vault
+// @Param publicKeyECDSA path string true "Public key ECDSA (66 characters hex)"
+// @Param code path string true "Verification code"
+// @Success 200
+// @Failure 400
+// @Router /vault/verify/{publicKeyECDSA}/{code} [get]
 func (s *Server) VerifyCode(c echo.Context) error {
 	publicKeyECDSA := c.Param("publicKeyECDSA")
 	if publicKeyECDSA == "" {
